@@ -5,17 +5,22 @@ package main
 
 import (
 	"fmt"
-	"hexasoftware/cmd/httpServe/binAssets"
-	_ "hexasoftware/lib/prettylog/global"
 	"io"
 	"io/ioutil"
-	"log"
 	"mime"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"dev.hexasoftware.com/hxs/httpServe/binAssets"
+
+	"dev.hexasoftware.com/hxs/prettylog"
+)
+
+var (
+	log = prettylog.New("httpServe")
 )
 
 func CreateHandleFunc(prefix string) func(http.ResponseWriter, *http.Request) {
