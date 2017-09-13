@@ -1,148 +1,58 @@
 // Simpliest server
 package main
 
-//go:generate folder2go assets binAssets
+//go:generate folder2go -handler assets binAssets
 
 import (
+	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
-	"mime"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"text/template"
 
 	"dev.hexasoftware.com/hxs/httpServe/binAssets"
+	"dev.hexasoftware.com/stdio/wsrpc"
+	"github.com/fsnotify/fsnotify"
+	"github.com/gohxs/prettylog"
+	"github.com/gohxs/webu"
+	"github.com/gohxs/webu/chain"
 
-	"dev.hexasoftware.com/hxs/prettylog"
+	"github.com/shurcooL/github_flavored_markdown/gfmstyle"
 )
 
 var (
-	log = prettylog.New("httpServe")
+	log  = prettylog.New("httpServe")
+	tmpl = template.New("")
 )
 
-func CreateHandleFunc(prefix string) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var solvedPath = r.URL.Path
-		if solvedPath == prefix {
-			solvedPath = prefix + "/index.html"
-		}
-		log.Printf("%s - (embed)%s", r.Method, r.URL.Path)
-		if strings.HasPrefix(solvedPath, prefix) {
-			solvedPath = solvedPath[len(prefix):]
-		}
-		data, ok := binAssets.Data[solvedPath]
-		if !ok {
-			w.WriteHeader(404)
-		}
-		w.Header().Set("Content-type", mime.TypeByExtension(filepath.Ext(solvedPath)))
-		w.Write(data)
-	}
-}
-
-func HandleMarkDown(w http.ResponseWriter, r *http.Request, path string) error {
-	log.Println("Handling markdown")
-	f, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	/* // Server side markdown2html
-	data, err := ioutil.ReadAll(f)
-	if err != nil {
-		return err
-	}
-	w.Write([]byte("<html><head><link rel='stylesheet' href='/.httpServe/strapdown.css'><link rel='stylesheet' href='/.httpServe/themes/united.min.css'></head><body>"))
-	mdData := blackfriday.MarkdownCommon(data)
-	w.Write(mdData)
-	w.Write([]byte("</body></html>"))
-	return nil
-	*/
-	w.Write([]byte(
-		`
-<!DOCTYPE html>
-<html>
-<xmp theme="paper" style="display:none;">
-`))
-
-	io.Copy(w, f)
-	w.Write([]byte(
-		`
-			</xmp>
-	<script src=".httpServe/strapdown.js"></script>
-</html>`))
-	return nil
-}
-
-func HandleFolder(w http.ResponseWriter, r *http.Request, path string) error {
-
-	res, err := ioutil.ReadDir(path)
-	if err != nil {
-		return err
-	}
-	w.Write([]byte(
-		`<html>
- <body>
- <ul>`))
-	for _, f := range res {
-		w.Write([]byte(fmt.Sprintf(`<li><a href="/%s">%s</a>`, path+"/"+f.Name(), f.Name())))
-	}
-	w.Write([]byte(
-		`</ul>
- </body>
- </html>
- `))
-
-	return nil
-}
-
-type FileServer struct {
-}
-
-func (FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	path := r.URL.Path[1:]
-	if path == "" {
-		path = "index.html"
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			path = "."
-		}
-	}
-
-	if strings.Contains(path, "..") {
-		http.ServeFile(w, r, path)
-	}
-	log.Printf("%s - %s", r.Method, r.URL.Path)
-
-	fstat, err := os.Stat(path)
-	if err != nil {
-		log.Println("ERR:", err)
-		http.ServeFile(w, r, path)
-		return
-	}
-	if fstat.IsDir() {
-		HandleFolder(w, r, path)
-		return
-	}
-
-	if filepath.Ext(path) == ".md" {
-		err := HandleMarkDown(w, r, path)
-		if err != nil {
-			http.ServeFile(w, r, path)
-		}
-		return
-	}
-
-	// Default file server
-	http.ServeFile(w, r, path)
-}
-
 func main() {
+	prettylog.Global()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/.httpServe/", CreateHandleFunc("/.httpServe"))
-	mux.Handle("/", FileServer{})
+	c := chain.New(webu.ChainLogger(prettylog.New("serve")))
+
+	mux.HandleFunc("/.httpServe/_reload/", wsrpc.New(wsrpcClient).ServeHTTP)
+	mux.Handle("/.httpServe/gfm/", http.StripPrefix("/.httpServe/gfm", http.FileServer(gfmstyle.Assets)))
+	mux.HandleFunc("/.httpServe/", binAssets.AssetHandleFunc)
+	// Only logs this
+	mux.HandleFunc("/", c.Build(fileServe))
+
+	// Load templates from binAssets
+	tmplFiles := []string{
+		"tmpl/MD.tmpl",
+		"tmpl/Folder.tmpl",
+	}
+	for _, v := range tmplFiles {
+		_, err := tmpl.New(v).Parse(string(binAssets.Data[v]))
+		if err != nil {
+			log.Fatal("Internal error, loading templates")
+		}
+	}
+
 	var port = 8080
 	for {
 		addr := fmt.Sprintf(":%d", port)
@@ -158,4 +68,105 @@ func main() {
 		http.Serve(listener, mux)
 	}
 	//http.ListenAndServe(":8080", http.FileServer(http.Dir('.')))
+}
+
+func wsrpcClient(ctx *wsrpc.ClientCtx) {
+	log.Println("Ws connected")
+	watcher, err := fsnotify.NewWatcher() // watcher per socket
+	if err != nil {
+		return
+	}
+	defer watcher.Close()
+
+	ctx.Define("watch", func(params ...interface{}) (interface{}, error) {
+		toWatch, ok := params[0].(string)
+		if !ok {
+			return nil, errors.New("Param invalid")
+		}
+		absFile, err := filepath.Abs(toWatch[1:])
+		if err != nil {
+			return nil, err
+		}
+		err = watcher.Add(absFile) // remove root '/' prefix
+		if err != nil {
+			log.Println("Error watching", err)
+		}
+		// Request to watch something?
+		return true, nil
+	})
+
+	for {
+		select {
+		case event := <-watcher.Events:
+			if event.Op&fsnotify.Remove != 0 {
+				ctx.Call("reload")
+			}
+		case <-ctx.Done():
+			return
+		}
+	}
+
+}
+
+func handleMarkDown(w http.ResponseWriter, r *http.Request, path string) error {
+	fileData, err := ioutil.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	err = tmpl.ExecuteTemplate(w, "tmpl/MD.tmpl", map[string]interface{}{
+		"path":    path,
+		"content": string(fileData),
+	})
+	return err
+}
+
+func handleFolder(w http.ResponseWriter, r *http.Request, path string) error {
+	res, err := ioutil.ReadDir(path)
+	if err != nil {
+		return err
+	}
+	err = tmpl.ExecuteTemplate(w, "tmpl/Folder.tmpl", map[string]interface{}{
+		"path":    path,
+		"content": res,
+	})
+	return err
+}
+
+func fileServe(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path[1:]
+	if path == "" {
+		path = "index.html"
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			path = "."
+		}
+	}
+
+	if strings.Contains(path, "..") {
+		http.ServeFile(w, r, path)
+	}
+	//log.Printf("%s - %s", r.Method, r.URL.Path)
+
+	fstat, err := os.Stat(path)
+	if err != nil {
+		webu.WriteStatus(w, http.StatusNotFound)
+		return
+	}
+
+	if fstat.IsDir() {
+		err := handleFolder(w, r, path)
+		if err != nil {
+			webu.WriteStatus(w, http.StatusInternalServerError, err)
+		}
+		return
+	}
+
+	if filepath.Ext(path) == ".md" {
+		err := handleMarkDown(w, r, path)
+		if err != nil {
+			webu.WriteStatus(w, http.StatusInternalServerError, err)
+		}
+		return
+	}
+	http.ServeFile(w, r, path)
 }

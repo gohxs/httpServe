@@ -1,0 +1,10 @@
+<html>
+	<body>
+		<ul>
+			{{range .content}}
+				<li><a href="/{{$.path}}/{{.Name}}">{{.Name}}</a>
+				{{end}}
+		</ul>
+	</body>
+</html>
+
