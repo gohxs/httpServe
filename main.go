@@ -1,6 +1,7 @@
 // Simpliest server
 package main
 
+//go:generate genversion -out version.go -package main
 //go:generate folder2go -handler assets binAssets
 
 import (
@@ -20,8 +21,6 @@ import (
 	"github.com/gohxs/prettylog"
 	"github.com/gohxs/webu"
 	"github.com/gohxs/webu/chain"
-
-	"github.com/shurcooL/github_flavored_markdown/gfmstyle"
 )
 
 var (
@@ -32,11 +31,12 @@ var (
 func main() {
 	prettylog.Global()
 
+	log.Println("V:", Version)
+
 	mux := http.NewServeMux()
 	c := chain.New(webu.ChainLogger(prettylog.New("serve")))
 
 	mux.HandleFunc("/.httpServe/_reload/", wsrpc.New(wsrpcClient).ServeHTTP)
-	mux.Handle("/.httpServe/gfm/", http.StripPrefix("/.httpServe/gfm", http.FileServer(gfmstyle.Assets)))
 	mux.HandleFunc("/.httpServe/", binAssets.AssetHandleFunc)
 	// Only logs this
 	mux.HandleFunc("/", c.Build(fileServe))
