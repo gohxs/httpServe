@@ -15,12 +15,13 @@ import (
 	"strings"
 	"text/template"
 
-	"dev.hexasoftware.com/hxs/httpServe/binAssets"
 	"dev.hexasoftware.com/stdio/wsrpc"
 	"github.com/fsnotify/fsnotify"
+	"github.com/gohxs/httpServe/binAssets"
 	"github.com/gohxs/prettylog"
 	"github.com/gohxs/webu"
 	"github.com/gohxs/webu/chain"
+	isatty "github.com/mattn/go-isatty"
 )
 
 var (
@@ -29,6 +30,10 @@ var (
 )
 
 func main() {
+	if !isatty.IsTerminal(os.Stderr.Fd()) {
+		prettylog.Style.Enable(false)
+	}
+
 	prettylog.Global()
 
 	log.Println("V:", Version)
@@ -71,7 +76,6 @@ func main() {
 }
 
 func wsrpcClient(ctx *wsrpc.ClientCtx) {
-	log.Println("Ws connected")
 	watcher, err := fsnotify.NewWatcher() // watcher per socket
 	if err != nil {
 		return
@@ -145,7 +149,6 @@ func fileServe(w http.ResponseWriter, r *http.Request) {
 	if strings.Contains(path, "..") {
 		http.ServeFile(w, r, path)
 	}
-	//log.Printf("%s - %s", r.Method, r.URL.Path)
 
 	fstat, err := os.Stat(path)
 	if err != nil {

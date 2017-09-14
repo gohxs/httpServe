@@ -1,9 +1,9 @@
 httpServe
 =============
 
-Cli tool to serve current directory contents
-
-Renders markdown using clientside strapdown.js
+Simple tool I wrote and use to serve current directory contents without
+any hustle, it renders markdown using clientside [strapdownjs](http://strapdownjs.com/)
+and does live reload when files changed
 
 Usage:
 
@@ -13,7 +13,8 @@ go get github.com/gohxs/httpServe
 httpServe
 ```
 
-####Changelog
+Changelog
+---------
 
 * Added support for live reload of certain files
-	* markdown
+  * markdown
