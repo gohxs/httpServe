@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<link href="/.httpServe/markdown/css/github.min.css" rel="stylesheet">
+		<link href="/.httpServe/markdown/css/highlight.min.css" rel="stylesheet">
+
+		<script src="/.httpServe/_reload/wsrpc.js"></script>
+		<script src="/.httpServe/js/watcher.js"></script>
+		<script src="/.httpServe/markdown/js/highlight.min.js"></script>
+		<script src="/.httpServe/markdown/js/showdown.min.js"></script>
+		<style>
+			body {
+				margin: 20px 200px;
+			}
+		</style>
+	</head>
+	<body class="markdown-body">
+	<markdown style="display:none;">{{.content}}</markdown>
+	<div id="output">
+	</div>
+
+	<script>
+		hljs.initHighlightingOnLoad();
+		var converter = new showdown.Converter()
+		converter.setFlavor('github');
+
+		var outputEl = document.getElementById('output')
+		var elList = document.getElementsByTagName('markdown')
+		if (elList.length == 0) {
+			outputEl.innerHTML = 'Error finding element'
+		}
+		var inEl = elList[0]
+		outputEl.innerHTML =  converter.makeHtml(inEl.innerText)
+
+	</script>
+	</body>
+</html>

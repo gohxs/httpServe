@@ -30,11 +30,9 @@ var (
 )
 
 func main() {
-	if !isatty.IsTerminal(os.Stderr.Fd()) {
-		prettylog.Style.Enable(false)
+	if isatty.IsTerminal(os.Stderr.Fd()) {
+		prettylog.Global()
 	}
-
-	prettylog.Global()
 
 	log.Println("V:", Version)
 
@@ -48,8 +46,8 @@ func main() {
 
 	// Load templates from binAssets
 	tmplFiles := []string{
-		"tmpl/MD.tmpl",
-		"tmpl/Folder.tmpl",
+		"tmpl/markdown.tmpl", // should automatic set files
+		"tmpl/folder.tmpl",
 	}
 	for _, v := range tmplFiles {
 		_, err := tmpl.New(v).Parse(string(binAssets.Data[v]))
@@ -118,7 +116,10 @@ func handleMarkDown(w http.ResponseWriter, r *http.Request, path string) error {
 		return err
 	}
 
-	err = tmpl.ExecuteTemplate(w, "tmpl/MD.tmpl", map[string]interface{}{
+	//Testing
+	//fileData = bytes.Replace(fileData, []byte(">"), []byte("&gt;"), -1)
+
+	err = tmpl.ExecuteTemplate(w, "tmpl/markdown.tmpl", map[string]interface{}{
 		"path":    path,
 		"content": string(fileData),
 	})
@@ -130,7 +131,7 @@ func handleFolder(w http.ResponseWriter, r *http.Request, path string) error {
 	if err != nil {
 		return err
 	}
-	err = tmpl.ExecuteTemplate(w, "tmpl/Folder.tmpl", map[string]interface{}{
+	err = tmpl.ExecuteTemplate(w, "tmpl/folder.tmpl", map[string]interface{}{
 		"path":    path,
 		"content": res,
 	})
