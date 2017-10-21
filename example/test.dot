@@ -1,0 +1,6 @@
+# http://www.graphviz.org/content/cluster
+digraph G {
+ A -> B
+ C -> B
+}
+

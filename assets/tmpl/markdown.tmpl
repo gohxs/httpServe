@@ -5,12 +5,12 @@
 		<link href="/.httpServe/markdown/css/highlight.min.css" rel="stylesheet">
 
 		<script src="/.httpServe/_reload/wsrpc.js"></script>
-		<script src="/.httpServe/js/watcher.js"></script>
 		<script src="/.httpServe/markdown/js/highlight.min.js"></script>
 		<script src="/.httpServe/markdown/js/showdown.min.js"></script>
+		<script src="/.httpServe/markdown/js/viz.js"></script>
 		<style>
 			body {
-				margin: 20px 200px;
+				margin: 20px 20%;
 			}
 		</style>
 	</head>
@@ -23,6 +23,7 @@
 		hljs.initHighlightingOnLoad();
 		var converter = new showdown.Converter()
 		converter.setFlavor('github');
+		converter.setOption('simpleLineBreaks',false)
 
 		var outputEl = document.getElementById('output')
 		var elList = document.getElementsByTagName('markdown')
@@ -32,6 +33,20 @@
 		var inEl = elList[0]
 		outputEl.innerHTML =  converter.makeHtml(inEl.innerText)
 
+		// Process viz
+		elList = document.querySelectorAll("code.viz,code.dot")
+
+		for (var i = 0; i < elList.length; i++) {
+			var text = elList[i].innerText
+			var res = Viz(text)
+			var divEl = document.createElement("div")
+			divEl.innerHTML= res
+			// get <pre> node
+			elList[i].parentNode.parentNode.replaceChild(divEl, elList[i].parentNode)
+			//elList[i].innerHTML = res
+		}
+
 	</script>
+	<script src="/.httpServe/js/watcher.js"></script>
 	</body>
 </html>

@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -110,6 +111,55 @@ func wsrpcClient(ctx *wsrpc.ClientCtx) {
 
 }
 
+func fileServe(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path[1:]
+	if path == "" {
+		path = "index.html"
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			path = "."
+		}
+	}
+	if strings.Contains(path, "..") {
+		http.ServeFile(w, r, path)
+	}
+
+	if filepath.Ext(path) == ".md" {
+		err := handleMarkDown(w, r, path)
+		if err != nil {
+			webu.WriteStatus(w, http.StatusInternalServerError, err)
+		}
+		return
+	}
+	if strings.HasSuffix(path, ".dot") {
+		err := handleDot(w, r, path)
+		if err != nil {
+			webu.WriteStatus(w, http.StatusInternalServerError, err)
+		}
+		return
+	}
+	if strings.HasSuffix(path, ".dot.png") {
+		err := handleDot(w, r, path[:len(path)-4])
+		if err != nil {
+			webu.WriteStatus(w, http.StatusInternalServerError, err)
+		}
+		return
+	}
+	fstat, err := os.Stat(path)
+	if err != nil {
+		webu.WriteStatus(w, http.StatusNotFound)
+		return
+	}
+	if fstat.IsDir() {
+		err := handleFolder(w, r, path)
+		if err != nil {
+			webu.WriteStatus(w, http.StatusInternalServerError, err)
+		}
+		return
+	}
+
+	http.ServeFile(w, r, path)
+}
+
 func handleMarkDown(w http.ResponseWriter, r *http.Request, path string) error {
 	fileData, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -138,39 +188,14 @@ func handleFolder(w http.ResponseWriter, r *http.Request, path string) error {
 	return err
 }
 
-func fileServe(w http.ResponseWriter, r *http.Request) {
-	path := r.URL.Path[1:]
-	if path == "" {
-		path = "index.html"
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			path = "."
-		}
-	}
-
-	if strings.Contains(path, "..") {
-		http.ServeFile(w, r, path)
-	}
-
-	fstat, err := os.Stat(path)
+// Execute command `dot`
+func handleDot(w http.ResponseWriter, r *http.Request, path string) error {
+	//log.Println("Executing dot for path", path, path[:len(path)-4])
+	absPath, err := filepath.Abs(path)
 	if err != nil {
-		webu.WriteStatus(w, http.StatusNotFound)
-		return
+		return err
 	}
-
-	if fstat.IsDir() {
-		err := handleFolder(w, r, path)
-		if err != nil {
-			webu.WriteStatus(w, http.StatusInternalServerError, err)
-		}
-		return
-	}
-
-	if filepath.Ext(path) == ".md" {
-		err := handleMarkDown(w, r, path)
-		if err != nil {
-			webu.WriteStatus(w, http.StatusInternalServerError, err)
-		}
-		return
-	}
-	http.ServeFile(w, r, path)
+	cmd := exec.Command("dot", "-Tpng", absPath)
+	cmd.Stdout = w
+	return cmd.Run()
 }

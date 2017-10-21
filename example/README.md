@@ -1,5 +1,9 @@
 # MARKDOWN TEST
 
+## testing line break
+test1
+this shoulbe next
+
 ## Testing markdown
 
 ```go
@@ -17,6 +21,28 @@ func main() {
 
   console.log('no way')
 ```
+
+```dot
+# http://www.graphviz.org/content/cluster
+
+digraph G {
+  A[label="request"]
+  B[label="markdown template"]
+  C[label="client side rendering of markdown"]
+  D[label="reading code.dot"]
+  E[label="viz.js"]
+  F[label="This graph"]
+
+  A -> B
+  B -> C
+  C -> D
+  D -> E -> F
+}
+```
+
+### httpServe GraphViz 'dot'
+
+![image](test.dot)
 
 ### Test table
 
