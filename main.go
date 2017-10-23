@@ -7,6 +7,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"html/template"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -14,7 +15,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"text/template"
 
 	"dev.hexasoftware.com/stdio/wsrpc"
 	"github.com/fsnotify/fsnotify"
@@ -171,7 +171,7 @@ func handleMarkDown(w http.ResponseWriter, r *http.Request, path string) error {
 
 	err = tmpl.ExecuteTemplate(w, "tmpl/markdown.tmpl", map[string]interface{}{
 		"path":    path,
-		"content": string(fileData),
+		"content": template.HTML(string(fileData)),
 	})
 	return err
 }

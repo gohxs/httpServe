@@ -20,3 +20,10 @@ Changelog
 
 * Added support for live reload of certain files
   * markdown
+* Render graphviz with viz.js for `dotg` language in code blocks
+
+Todo
+---------
+
+* Consider using server side markdown https://github.com/russross/blackfriday
+

@@ -15,33 +15,35 @@
 		</style>
 	</head>
 	<body class="markdown-body">
-	<markdown style="display:none;">{{.content}}</markdown>
+	<textarea class="markdown" style="display:none;">{{.content}}</textarea>
 	<div id="output">
 	</div>
 
 	<script>
 		hljs.initHighlightingOnLoad();
+		
 		var converter = new showdown.Converter()
 		converter.setFlavor('github');
 		converter.setOption('simpleLineBreaks',false)
 
 		var outputEl = document.getElementById('output')
-		var elList = document.getElementsByTagName('markdown')
+		var elList = document.querySelectorAll('.markdown')
 		if (elList.length == 0) {
 			outputEl.innerHTML = 'Error finding element'
 		}
 		var inEl = elList[0]
-		outputEl.innerHTML =  converter.makeHtml(inEl.innerText)
+		outputEl.innerHTML =  converter.makeHtml(inEl.value)
 
+		//////////////////////
 		// Process viz
-		elList = document.querySelectorAll("code.viz,code.dot")
-
+		////////////////
+		elList = document.querySelectorAll("code.dotg")
 		for (var i = 0; i < elList.length; i++) {
 			var text = elList[i].innerText
 			var res = Viz(text)
 			var divEl = document.createElement("div")
 			divEl.innerHTML= res
-			// get <pre> node
+			// get <pre> node from previous converter
 			elList[i].parentNode.parentNode.replaceChild(divEl, elList[i].parentNode)
 			//elList[i].innerHTML = res
 		}

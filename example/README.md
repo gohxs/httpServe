@@ -22,7 +22,7 @@ func main() {
   console.log('no way')
 ```
 
-```dot
+```dotg
 # http://www.graphviz.org/content/cluster
 
 digraph G {
@@ -66,4 +66,6 @@ Enumeration
 #### quote 4
 
 not me
+
+<h1> Support html inside markdown </h1>
 
