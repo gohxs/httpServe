@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -86,13 +87,17 @@ func wsrpcClient(ctx *wsrpc.ClientCtx) {
 		if !ok {
 			return nil, errors.New("Param invalid")
 		}
-		absFile, err := filepath.Abs(toWatch[1:])
+		u, err := url.Parse(toWatch)
+		if err != nil {
+			return nil, err
+		}
+		absFile, err := filepath.Abs(u.Path[1:])
 		if err != nil {
 			return nil, err
 		}
 		err = watcher.Add(absFile) // remove root '/' prefix
 		if err != nil {
-			log.Println("Error watching", err)
+			log.Printf("Error watching '%s (%s)' -- %s", toWatch, u.Path, err.Error())
 		}
 		// Request to watch something?
 		return true, nil
@@ -113,14 +118,31 @@ func wsrpcClient(ctx *wsrpc.ClientCtx) {
 
 func fileServe(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path[1:]
+
 	if path == "" {
-		path = "index.html"
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			path = "."
-		}
+		path = "." // Cur dir
 	}
-	if strings.Contains(path, "..") {
+
+	if strings.Contains(path, "..") { // ServeFile will normalize path
 		http.ServeFile(w, r, path)
+	}
+
+	fstat, err := os.Stat(path)
+	if err != nil {
+		webu.WriteStatus(w, http.StatusNotFound)
+		return
+	}
+	// It is a dir
+	if fstat.IsDir() {
+		indexFile := filepath.Join(path, "index.html")
+		if _, err := os.Stat(indexFile); err == nil {
+			http.ServeFile(w, r, indexFile)
+		}
+		err := handleFolder(w, r, path)
+		if err != nil {
+			webu.WriteStatus(w, http.StatusInternalServerError, err)
+		}
+		return
 	}
 
 	if filepath.Ext(path) == ".md" {
@@ -130,33 +152,13 @@ func fileServe(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	if strings.HasSuffix(path, ".dot") {
-		err := handleDot(w, r, path)
+	if strings.HasSuffix(path, ".dot") && r.URL.Query().Get("f") == "png" {
+		err := handleDotPng(w, r, path)
 		if err != nil {
 			webu.WriteStatus(w, http.StatusInternalServerError, err)
 		}
 		return
 	}
-	if strings.HasSuffix(path, ".dot.png") {
-		err := handleDot(w, r, path[:len(path)-4])
-		if err != nil {
-			webu.WriteStatus(w, http.StatusInternalServerError, err)
-		}
-		return
-	}
-	fstat, err := os.Stat(path)
-	if err != nil {
-		webu.WriteStatus(w, http.StatusNotFound)
-		return
-	}
-	if fstat.IsDir() {
-		err := handleFolder(w, r, path)
-		if err != nil {
-			webu.WriteStatus(w, http.StatusInternalServerError, err)
-		}
-		return
-	}
-
 	http.ServeFile(w, r, path)
 }
 
@@ -189,7 +191,7 @@ func handleFolder(w http.ResponseWriter, r *http.Request, path string) error {
 }
 
 // Execute command `dot`
-func handleDot(w http.ResponseWriter, r *http.Request, path string) error {
+func handleDotPng(w http.ResponseWriter, r *http.Request, path string) error {
 	//log.Println("Executing dot for path", path, path[:len(path)-4])
 	absPath, err := filepath.Abs(path)
 	if err != nil {

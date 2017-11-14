@@ -42,7 +42,7 @@ digraph G {
 
 ### httpServe GraphViz 'dot'
 
-![image](test.dot)
+![image](test.dot?f=png)
 
 ### Test table
 
