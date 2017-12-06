@@ -5,6 +5,7 @@ package main
 //go:generate folder2go -handler assets binAssets
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"html/template"
@@ -68,7 +69,21 @@ func main() {
 			log.Println("Trying port", port)
 			continue
 		}
-		log.Println("Listening with port:", port)
+
+		log.Printf("Listening at:")
+
+		addrW := bytes.NewBuffer(nil)
+		fmt.Fprintf(addrW, "    http://localhost:%d\n", port)
+		addrs, err := net.InterfaceAddrs()
+		for _, a := range addrs {
+			astr := a.String()
+			if strings.HasPrefix(astr, "192.168") ||
+				strings.HasPrefix(astr, "10") {
+				a := strings.Split(astr, "/")[0]
+				fmt.Fprintf(addrW, "    http://%s:%d\n", a, port)
+			}
+		}
+		log.Println(addrW.String())
 
 		http.Serve(listener, mux)
 	}
