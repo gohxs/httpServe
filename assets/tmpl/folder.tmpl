@@ -2,8 +2,12 @@
 	<body>
 		<ul>
 			{{range .content}}
+				{{if .IsDir }}
+				<li><a href="/{{$.path}}/{{.Name}}/">{{.Name}}/</a>
+				{{else}}
 				<li><a href="/{{$.path}}/{{.Name}}">{{.Name}}</a>
 				{{end}}
+			{{end}}
 		</ul>
 	</body>
 </html>
