@@ -7,6 +7,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"flag"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -30,12 +31,18 @@ import (
 var (
 	log  = prettylog.New("httpServe")
 	tmpl = template.New("")
+
+	// Flags
+	mdCSS string
 )
 
 func main() {
 	if isatty.IsTerminal(os.Stderr.Fd()) {
 		prettylog.Global()
 	}
+
+	flag.StringVar(&mdCSS, "md-css", "", "add a css file while rendering markdown")
+	flag.Parse()
 
 	log.Println("V:", Version)
 
@@ -187,6 +194,7 @@ func handleMarkDown(w http.ResponseWriter, r *http.Request, path string) error {
 	//fileData = bytes.Replace(fileData, []byte(">"), []byte("&gt;"), -1)
 
 	err = tmpl.ExecuteTemplate(w, "tmpl/markdown.tmpl", map[string]interface{}{
+		"css":     mdCSS,
 		"path":    path,
 		"content": template.HTML(string(fileData)),
 	})
