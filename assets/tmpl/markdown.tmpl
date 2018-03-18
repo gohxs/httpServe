@@ -1,13 +1,15 @@
 <!DOCTYPE html>
 <html>
 	<head>
+		<meta http-equiv='cache-control' content='no-cache'>
+		<meta http-equiv='expires' content='0'>
+		<meta http-equiv='pragma' content='no-cache'>
 		<link href="/.httpServe/markdown/css/github.min.css" rel="stylesheet">
 		<link href="/.httpServe/markdown/css/highlight.min.css" rel="stylesheet">
-		<link href="{{.css}}" rel="stylesheet">
+		<link href="{{.css}}?r={{.rand}}" rel="stylesheet">
 
 		<script src="/.httpServe/_reload/wsrpc.js"></script>
 		<script src="/.httpServe/markdown/js/highlight.min.js"></script>
-		<script src="/.httpServe/markdown/js/showdown.min.js"></script>
 		<script src="/.httpServe/markdown/js/viz.js"></script>
 		<style>
 			body {
@@ -16,29 +18,14 @@
 		</style>
 	</head>
 	<body class="markdown-body">
-	<textarea class="markdown" style="display:none;">{{.content}}</textarea>
-	<div id="output">
-	</div>
-
+		{{.outputHTML}}
 	<script>
 		hljs.initHighlightingOnLoad();
-		
-		var converter = new showdown.Converter()
-		converter.setFlavor('github');
-		converter.setOption('simpleLineBreaks',false)
-
-		var outputEl = document.getElementById('output')
-		var elList = document.querySelectorAll('.markdown')
-		if (elList.length == 0) {
-			outputEl.innerHTML = 'Error finding element'
-		}
-		var inEl = elList[0]
-		outputEl.innerHTML =  converter.makeHtml(inEl.value)
-
 		//////////////////////
 		// Process viz
 		////////////////
-		elList = document.querySelectorAll("code.dotg")
+		elList = document.querySelectorAll("code.language-dotg,code.dotg")
+		console.log("Processing viz:", elList)
 		for (var i = 0; i < elList.length; i++) {
 			var text = elList[i].innerText
 			var res = Viz(text)
@@ -48,6 +35,7 @@
 			elList[i].parentNode.parentNode.replaceChild(divEl, elList[i].parentNode)
 			//elList[i].innerHTML = res
 		}
+
 
 	</script>
 	<script src="/.httpServe/js/watcher.js"></script>

@@ -1,5 +1,4 @@
-httpServe
-=============
+# httpServe
 
 Simple tool I wrote and use to serve current directory contents without
 any hassle, it renders markdown using clientside [strapdownjs](http://strapdownjs.com/)
@@ -15,15 +14,14 @@ go get github.com/gohxs/httpServe
 httpServe
 ```
 
-Changelog
----------
+## Changelog
 
 * Added support for live reload of certain files
   * markdown
 * Render graphviz with viz.js for `dotg` language in code blocks
+* Server rendering blackfriday
+* Added .css to watcher for custom styled markdown hot reloading
 
-Todo
----------
+## Todo
 
-* Consider using server side markdown https://github.com/russross/blackfriday
-
+* ~~Consider using server side markdown https://github.com/russross/blackfriday~~

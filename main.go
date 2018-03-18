@@ -2,7 +2,7 @@
 package main
 
 //go:generate genversion -out version.go -package main
-//go:generate folder2go -handler assets binAssets
+//go:generate folder2go -nobackup -handler assets binAssets
 
 import (
 	"bytes"
@@ -18,6 +18,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"dev.hexasoftware.com/stdio/wsrpc"
 	"github.com/fsnotify/fsnotify"
@@ -26,6 +27,8 @@ import (
 	"github.com/gohxs/webu"
 	"github.com/gohxs/webu/chain"
 	isatty "github.com/mattn/go-isatty"
+	"golang.org/x/exp/rand"
+	blackfriday "gopkg.in/russross/blackfriday.v2"
 )
 
 var (
@@ -50,7 +53,7 @@ func main() {
 	c := chain.New(webu.ChainLogger(prettylog.New("serve")))
 
 	mux.HandleFunc("/.httpServe/_reload/", wsrpc.New(wsrpcClient).ServeHTTP)
-	mux.HandleFunc("/.httpServe/", binAssets.AssetHandleFunc)
+	mux.HandleFunc("/.httpServe/", c.Build(binAssets.AssetHandleFunc))
 	// Only logs this
 	mux.HandleFunc("/", c.Build(fileServe))
 
@@ -66,7 +69,9 @@ func main() {
 		}
 	}
 
+	// Initial port
 	var port = 8080
+
 	for {
 		addr := fmt.Sprintf(":%d", port)
 		listener, err := net.Listen("tcp", addr)
@@ -129,6 +134,8 @@ func wsrpcClient(ctx *wsrpc.ClientCtx) {
 		select {
 		case event := <-watcher.Events:
 			if event.Op&fsnotify.Remove != 0 {
+				// Delay a bit because sometimes vim removes the file to format
+				<-time.After(200 * time.Millisecond)
 				ctx.Call("reload")
 			}
 		case <-ctx.Done():
@@ -181,6 +188,7 @@ func fileServe(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	w.Header().Set("Cache-Control", "no-cache")
 	http.ServeFile(w, r, path)
 }
 
@@ -190,13 +198,15 @@ func handleMarkDown(w http.ResponseWriter, r *http.Request, path string) error {
 		return err
 	}
 
-	//Testing
-	//fileData = bytes.Replace(fileData, []byte(">"), []byte("&gt;"), -1)
+	opt := blackfriday.WithExtensions(blackfriday.CommonExtensions | blackfriday.HeadingIDs | blackfriday.AutoHeadingIDs)
+
+	outputHTML := blackfriday.Run(fileData, opt)
 
 	err = tmpl.ExecuteTemplate(w, "tmpl/markdown.tmpl", map[string]interface{}{
-		"css":     mdCSS,
-		"path":    path,
-		"content": template.HTML(string(fileData)),
+		"rand":       rand.Int(),
+		"css":        mdCSS,
+		"path":       path,
+		"outputHTML": template.HTML(string(outputHTML)),
 	})
 	return err
 }
