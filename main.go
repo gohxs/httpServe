@@ -11,8 +11,10 @@ import (
 	"fmt"
 	"html/template"
 	"io/ioutil"
+	"mime"
 	"net"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"os"
 	"os/exec"
@@ -36,7 +38,8 @@ var (
 	tmpl = template.New("")
 
 	// Flags
-	mdCSS string
+	mdCSS   string
+	proxyTo string
 )
 
 func main() {
@@ -45,28 +48,22 @@ func main() {
 	}
 
 	flag.StringVar(&mdCSS, "md-css", "", "add a css file while rendering markdown")
+	flag.StringVar(&proxyTo, "proxy", "", "do not serve files only creates a reverse proxy")
 	flag.Parse()
-
 	log.Println("V:", Version)
 
-	mux := http.NewServeMux()
 	c := chain.New(webu.ChainLogger(prettylog.New("serve")))
 
-	mux.HandleFunc("/.httpServe/_reload/", wsrpc.New(wsrpcClient).ServeHTTP)
-	mux.HandleFunc("/.httpServe/", c.Build(binAssets.AssetHandleFunc))
-	// Only logs this
-	mux.HandleFunc("/", c.Build(fileServe))
-
-	// Load templates from binAssets
-	tmplFiles := []string{
-		"tmpl/markdown.tmpl", // should automatic set files
-		"tmpl/folder.tmpl",
-	}
-	for _, v := range tmplFiles {
-		_, err := tmpl.New(v).Parse(string(binAssets.Data[v]))
+	var r http.Handler
+	if len(proxyTo) != 0 {
+		log.Println("Proxy to:", proxyTo)
+		u, err := url.Parse(proxyTo)
 		if err != nil {
-			log.Fatal("Internal error, loading templates")
+			log.Fatal(err)
 		}
+		r = c.Build(httputil.NewSingleHostReverseProxy(u).ServeHTTP)
+	} else {
+		r = c.Build(muxAssets().ServeHTTP)
 	}
 
 	// Initial port
@@ -97,9 +94,50 @@ func main() {
 		}
 		log.Println(addrW.String())
 
-		http.Serve(listener, mux)
+		http.Serve(listener, r)
 	}
 	//http.ListenAndServe(":8080", http.FileServer(http.Dir('.')))
+}
+
+func muxAssets() *http.ServeMux {
+	// File muxer
+	mux := http.NewServeMux()
+	mux.Handle("/.httpServe/_reload/",
+		http.StripPrefix(
+			"/.httpServe/_reload/",
+			wsrpc.New(wsrpcClient),
+		))
+	mux.Handle("/.httpServe/", http.StripPrefix("/.httpServe", http.HandlerFunc(dataHandler)))
+	// Only logs this
+	mux.HandleFunc("/", handleFileServe)
+
+	// Load templates from binAssets
+	tmplFiles := []string{
+		"tmpl/markdown.tmpl", // should automatic set files
+		"tmpl/folder.tmpl",
+	}
+	for _, v := range tmplFiles {
+		_, err := tmpl.New(v).Parse(string(binAssets.Data[v]))
+		if err != nil {
+			log.Fatal("Internal error, loading templates")
+		}
+	}
+	return mux
+}
+func dataHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("Serving data:", r.URL.String())
+	urlPath := strings.TrimPrefix(r.URL.String(), "/")
+	if urlPath == "" {
+		urlPath = "index.html"
+	}
+	data, ok := binAssets.Data[urlPath]
+	if !ok {
+
+		webu.WriteStatus(w, http.StatusNotFound, "Not found")
+		return
+	}
+	w.Header().Set("Content-type", mime.TypeByExtension(filepath.Ext(urlPath)))
+	w.Write(data)
 }
 
 func wsrpcClient(ctx *wsrpc.ClientCtx) {
@@ -145,7 +183,7 @@ func wsrpcClient(ctx *wsrpc.ClientCtx) {
 
 }
 
-func fileServe(w http.ResponseWriter, r *http.Request) {
+func handleFileServe(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path[1:]
 
 	if path == "" {
@@ -189,6 +227,7 @@ func fileServe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	http.ServeFile(w, r, path)
 }
 
