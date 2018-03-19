@@ -1,20 +1,14 @@
-(function (window, WsRpc) {
-  // Wait for load
-  window.onload = function() {
-    var cli = new WsRpc()
+(function (window) {
+  var ws = null
+  var loc = 'ws://' + window.location.host + '/.httpServe/_reload'
 
-    cli.export({
-      'reload': function (result) {
-        result()
-        console.log('Reload should happen')
-        window.location.reload()
-      }
-    })
-    cli.connect('ws://' + window.location.host + '/.httpServe/_reload/ws')
-    cli.onopen = function () {
-      cli.call('watch', window.location.pathname).then(function (res) {
-        console.log('Watching:', res)
-      })
+
+  function connect(loc) {
+    ws = new window.WebSocket(loc)
+    ws.onopen = function() {
+      // Grab files to send to watcher
+      var fileList = []
+      fileList.push(window.location.pathname)
       // Load assets too
       var elList = document.querySelectorAll('link[href]')
       for (var i =0; i< elList.length; i++ ) {
@@ -25,9 +19,7 @@
         let toWatch = window.location.pathname
         toWatch = toWatch.substring(0, toWatch.lastIndexOf('/'))
         toWatch += '/' + src
-        cli.call('watch', toWatch).then(function (res) {
-          console.log('Watching:', toWatch)
-        })
+        fileList.push(toWatch)
       }
       // Find all src and request a watch too
       var elList = document.querySelectorAll('img[src]')
@@ -39,10 +31,21 @@
         let toWatch = window.location.pathname
         toWatch = toWatch.substring(0, toWatch.lastIndexOf('/'))
         toWatch += '/' + src
-        cli.call('watch', toWatch).then(function (res) {
-          console.log('Watching:', toWatch)
-        })
+        fileList.push(toWatch)
+      }
+      ws.send(JSON.stringify(fileList))
+    }
+    ws.onmessage = function(ev) {
+      if (JSON.parse(ev.data) === "reload") {
+        console.log('Reload should happen')
+        window.location.reload()
       }
     }
+    // Reconnect either on error or close
+    ws.onclose  = function(e)  {
+      setTimeout(() => connect(loc),3000)
+    }
   }
-})(window, WsRpc)
+	connect(loc)
+  
+})(window)
