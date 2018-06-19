@@ -36,10 +36,10 @@ func Render() *http.ServeMux {
 	c := chain.New(webu.ChainLogger(prettylog.New("file")))
 	// File muxer
 	mux := http.NewServeMux()
-	mux.HandleFunc("/.httpServe/_reload", c.Build(Watcher))
+	mux.Handle("/.httpServe/_reload", c.Build(http.HandlerFunc(Watcher)))
 	mux.Handle("/.httpServe/", http.StripPrefix("/.httpServe", http.HandlerFunc(binData)))
 	// Only logs this
-	mux.HandleFunc("/", c.Build(fileServe))
+	mux.Handle("/", c.Build(http.HandlerFunc(fileServe)))
 
 	return mux
 }

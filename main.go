@@ -46,7 +46,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		r = c.Build(httputil.NewSingleHostReverseProxy(u).ServeHTTP)
+		r = c.Build(httputil.NewSingleHostReverseProxy(u))
 	} else {
 		r = handler.Render()
 	}
