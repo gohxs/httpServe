@@ -27,8 +27,6 @@ var (
 
 func init() {
 	flag.StringVar(&flagMdCSS, "md-css", "", "add a css file while rendering markdown")
-	flag.Parse()
-
 }
 
 // Render Will select a render and output
