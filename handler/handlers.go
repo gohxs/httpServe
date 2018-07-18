@@ -64,6 +64,8 @@ func fileServe(w http.ResponseWriter, r *http.Request) {
 	if path == "" {
 		path = "." // Cur dir
 	}
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	if strings.Contains(path, "..") { // ServeFile will normalize path
 		http.ServeFile(w, r, path)
@@ -74,17 +76,26 @@ func fileServe(w http.ResponseWriter, r *http.Request) {
 		webu.WriteStatus(w, http.StatusNotFound)
 		return
 	}
+	raw := r.URL.Query().Get("raw")
+
 	// It is a dir
 	if fstat.IsDir() {
-		indexFile := filepath.Join(path, "index.html")
-		if _, err := os.Stat(indexFile); err == nil {
-			http.ServeFile(w, r, indexFile)
+		if raw != "1" {
+			indexFile := filepath.Join(path, "index.html")
+			if _, err := os.Stat(indexFile); err == nil {
+				http.ServeFile(w, r, indexFile)
+				return
+			}
 		}
 		err := renderFolder(w, r, path)
 		if err != nil {
 			webu.WriteStatus(w, http.StatusInternalServerError, err)
 		}
 		return
+	}
+
+	if raw == "1" {
+		http.ServeFile(w, r, path)
 	}
 
 	if filepath.Ext(path) == ".md" {
@@ -101,8 +112,7 @@ func fileServe(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	// default
 	http.ServeFile(w, r, path)
 }
 
