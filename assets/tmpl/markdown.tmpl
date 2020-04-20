@@ -28,8 +28,10 @@
 		for (var i = 0; i < elList.length; i++) {
 			var text = elList[i].innerText
 			var res = Viz(text)
+			var imgRes = Viz.svgXmlToPngImageElement(res)
+
 			var divEl = document.createElement("div")
-			divEl.innerHTML= res
+			divEl.appendChild(imgRes)
 			// get <pre> node from previous converter
 			elList[i].parentNode.parentNode.replaceChild(divEl, elList[i].parentNode)
 			//elList[i].innerHTML = res

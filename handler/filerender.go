@@ -1,12 +1,17 @@
 package handler
 
 import (
+	"bytes"
+	"encoding/base64"
+	"fmt"
 	"html/template"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/gohxs/httpServe/binAssets"
 	"golang.org/x/exp/rand"
@@ -20,6 +25,7 @@ func init() {
 	tmplFiles := []string{
 		"tmpl/markdown.tmpl", // should automatic set files
 		"tmpl/folder.tmpl",
+		"tmpl/wasm.tmpl",
 	}
 	for _, v := range tmplFiles {
 		_, err := tmpl.New(v).Parse(string(binAssets.Data[v]))
@@ -71,4 +77,53 @@ func renderDotPng(w http.ResponseWriter, r *http.Request, path string) error {
 	cmd := exec.Command("dot", "-Tpng", absPath)
 	cmd.Stdout = w
 	return cmd.Run()
+}
+
+func handleWasm(w http.ResponseWriter, r *http.Request, path string) error {
+	log.Println("Compile wasm, path:", path)
+
+	tf, err := ioutil.TempFile(os.TempDir(), "http-serve")
+	if err != nil {
+		return err
+	}
+	tf.Close()
+
+	defer os.Remove(tf.Name())
+
+	// BUILDCOMMAND
+	errBuf := new(bytes.Buffer)
+	cmd := exec.Command("go", "build", "-o", tf.Name(), "./"+path)
+	cmd.Env = append(os.Environ(), "GOOS=js", "GOARCH=wasm")
+	cmd.Stderr = errBuf
+	if err := cmd.Run(); err != nil {
+		fmt.Fprint(w, errBuf.String())
+		log.Println("err:", err)
+		// Print stderr
+		return err
+	}
+
+	// Code read
+	code, err := ioutil.ReadFile(tf.Name())
+	if err != nil {
+		log.Println("err:", err)
+		return err
+	}
+
+	// Load wasm exec
+	wasmExecNameBuf := new(bytes.Buffer)
+	c := exec.Command("go", "env", "GOROOT")
+	c.Stdout = wasmExecNameBuf
+	c.Run()
+	wasmExecName := strings.TrimSpace(wasmExecNameBuf.String())
+	wasmExecName = wasmExecName + "/misc/wasm/wasm_exec.js"
+
+	// Read wasm_exec from system dist
+	wasmExec, err := ioutil.ReadFile(wasmExecName)
+	if err != nil {
+		return err
+	}
+	return tmpl.ExecuteTemplate(w, "tmpl/wasm.tmpl", map[string]interface{}{
+		"wasmexec": template.JS(wasmExec),
+		"code":     base64.StdEncoding.EncodeToString(code),
+	})
 }

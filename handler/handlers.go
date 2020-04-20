@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -36,6 +38,16 @@ func Render() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.Handle("/.httpServe/_reload", c.Build(http.HandlerFunc(Watcher)))
 	mux.Handle("/.httpServe/", http.StripPrefix("/.httpServe", http.HandlerFunc(binData)))
+
+	mux.HandleFunc("/.httpServe/wasm_exec.js", func(w http.ResponseWriter, r *http.Request) {
+		out := new(bytes.Buffer)
+		c := exec.Command("go", "env", "GOROOT")
+		c.Stdout = out
+		c.Run()
+		p := strings.TrimSpace(out.String())
+		fname := p + "/misc/wasm/wasm_exec.js"
+		http.ServeFile(w, r, fname)
+	})
 	// Only logs this
 	mux.Handle("/", c.Build(http.HandlerFunc(fileServe)))
 
@@ -77,16 +89,25 @@ func fileServe(w http.ResponseWriter, r *http.Request) {
 	raw := r.URL.Query().Get("raw")
 
 	// It is a dir
+	// Handle dir in another method
 	if fstat.IsDir() {
 		if raw != "1" {
+			// Check for index file
 			indexFile := filepath.Join(path, "index.html")
 			if _, err := os.Stat(indexFile); err == nil {
 				http.ServeFile(w, r, indexFile)
 				return
 			}
+			// Check for main.go file
+			mainGo := filepath.Join(path, "main.go")
+			if _, err := os.Stat(mainGo); err == nil {
+				if err := handleWasm(w, r, path); err != nil {
+					webu.WriteStatus(w, http.StatusInternalServerError, err)
+				}
+				return
+			}
 		}
-		err := renderFolder(w, r, path)
-		if err != nil {
+		if err := renderFolder(w, r, path); err != nil {
 			webu.WriteStatus(w, http.StatusInternalServerError, err)
 		}
 		return
@@ -133,7 +154,6 @@ func Watcher(w http.ResponseWriter, r *http.Request) {
 	}
 	wsChan := make(chan int, 1)
 	go func() {
-
 		for {
 			select {
 			case event := <-watcher.Events:

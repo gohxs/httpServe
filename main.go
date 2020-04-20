@@ -1,7 +1,6 @@
 // Simpliest server
 package main
 
-//go:generate genversion -out version.go -package main
 //go:generate folder2go -nobackup -handler assets binAssets
 
 import (

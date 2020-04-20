@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<script>
+{{ .wasmexec }}
+(async () => {
+  const bs = window.atob("{{.code}}")
+  const len = bs.length
+  const bytes = new Uint8Array(len)
+  for (var i = 0;i<len;i++) { bytes[i] = bs.charCodeAt(i) }
+  const src = bytes.buffer
+  const go = new Go();
+  const result = await WebAssembly.instantiate(src, go.importObject);
+  go.run(result.instance);
+})();
+</script>
+<script src="/.httpServe/js/watcher.js"></script>
