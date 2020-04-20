@@ -14,8 +14,8 @@ import (
 	"strings"
 
 	"github.com/gohxs/httpServe/binAssets"
+	blackfriday "github.com/russross/blackfriday/v2"
 	"golang.org/x/exp/rand"
-	blackfriday "gopkg.in/russross/blackfriday.v2"
 )
 
 var tmpl = template.New("")
