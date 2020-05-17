@@ -84,9 +84,13 @@ func fileServe(w http.ResponseWriter, r *http.Request) {
 
 	fstat, err := os.Stat(path)
 	if err != nil {
-		err := renderNotFound(w, r, path)
-		if err != nil {
-			webu.WriteStatus(w, http.StatusInternalServerError, err)
+		if filepath.Ext(path) == ".md" {
+			err := renderNotFound(w, r, path)
+			if err != nil {
+				webu.WriteStatus(w, http.StatusInternalServerError, err)
+			}
+		} else {
+            		webu.WriteStatus(w, http.StatusNotFound)
 		}
 		return
 	}
