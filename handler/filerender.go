@@ -55,6 +55,18 @@ func renderMarkDown(w http.ResponseWriter, r *http.Request, path string) error {
 	return err
 }
 
+func renderNotFound(w http.ResponseWriter, r *http.Request, path string) error {
+	var err error
+
+	err = tmpl.ExecuteTemplate(w, "tmpl/markdown.tmpl", map[string]interface{}{
+		"rand":       rand.Int(),
+		"css":        flagMdCSS,
+		"path":       path,
+		"outputHTML": template.HTML("File not found"),
+	})
+	return err
+}
+
 func renderFolder(w http.ResponseWriter, r *http.Request, path string) error {
 	res, err := ioutil.ReadDir(path)
 	if err != nil {
