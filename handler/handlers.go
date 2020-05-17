@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"errors"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/gohxs/httpServe/binAssets"
@@ -83,7 +84,14 @@ func fileServe(w http.ResponseWriter, r *http.Request) {
 
 	fstat, err := os.Stat(path)
 	if err != nil {
-		webu.WriteStatus(w, http.StatusNotFound)
+		if filepath.Ext(path) == ".md" {
+			err := renderNotFound(w, r, path)
+			if err != nil {
+				webu.WriteStatus(w, http.StatusInternalServerError, err)
+			}
+		} else {
+            		webu.WriteStatus(w, http.StatusNotFound)
+		}
 		return
 	}
 	raw := r.URL.Query().Get("raw")
@@ -201,7 +209,12 @@ func Watcher(w http.ResponseWriter, r *http.Request) {
 				if err != nil {
 					return err
 				}
-				err = watcher.Add(absFile) // remove root '/' prefix
+				// if absFile does not exist, watch parent dir (and do this recursively)
+				err = errors.New("none")
+				for err != nil && absFile != ".." {
+					err = watcher.Add(absFile) // remove root '/' prefix
+					absFile = filepath.Dir(absFile)
+				}
 				if err != nil {
 					return fmt.Errorf("Error watching '%s (%s)' -- %s", toWatch, u.Path, err.Error())
 				}
